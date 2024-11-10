@@ -151,3 +151,43 @@ def classify_image(query_embedding, class_embeddings, class_names, top_n=3):
     similarities = class_embeddings_normalized @ query_embedding.T
     values, top_classes_idx = torch.topk(similarities, top_n)
     top_classes = [class_names[i] for i in top_classes_idx]
+    return top_classes, values
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+# Загрузка и подготовка классов
+with open("class_names.txt", "r") as file:
+    class_names = [line.strip() for line in file.readlines()]
+
+embeddings = pd.read_csv('/content/drive/MyDrive/embeddings_CLIP.csv')
+embeddings['embedding'] = embeddings['embedding'].progress_apply(
+    lambda x: torch.tensor(np.fromstring(x.strip('[]'), sep=' ')).to(device, dtype=torch.float32))
+
+class_embeddings = get_class_embeddings(class_names)
+
+test_paths = [test_path[-20:] for test_path in test_paths]
+valid_predictions_df
+
+# Создание нормализованных метрик для дальнейшего анализа
+def normalize_distances(distances):
+    min_dist, max_dist = min(distances), max(distances)
+    return [(d - min_dist) / (max_dist - min_dist) for d in distances]
+
+merged_df['metric_learning_dist'] = normalize_distances(merged_df['metric_learning_dist'])
+merged_df['similarity'] = normalize_distances(1 - merged_df['similarity'])
+merged_df['new_metric'] = merged_df['similarity'] + merged_df['metric_learning_dist']
+
+submis = []
+for f in for_metric_learning:
+    curr_df = valid_predictions_df[valid_predictions_df['file_name'] == f].nsmallest(10, columns='metric_learning_dist')
+    submis.append(pd.DataFrame({'image': [f],
+                  'recs': [list(curr_df['neighbor_file_name'])]}))
+
+for f in for_both:
+    curr_df = merged_df[merged_df['file_name'] == f].nsmallest(10, columns='new_metric')
+    submis.append(pd.DataFrame({'image': [f],
+                  'recs': [list(curr_df['neighbor_file_name'])]}))
+
+pd.concat(submis)
